@@ -89,21 +89,42 @@ export default function App() {
     setErrorNotice(null);
 
     try {
-      const res = await fetch("/api/fetch-tweet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
+      let res: Response;
+      try {
+        res = await fetch("/api/fetch-tweet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+      } catch {
+        // fetch() itself failed (network error / unresolvable URL). This is what
+        // surfaces as Safari's cryptic "The string did not match the expected pattern."
+        throw new Error(
+          "Couldn't reach the tweet server. Make sure the app is running with `npm run dev` and opened at http://localhost:3000 (the /api backend must be live)."
+        );
+      }
 
-      const data = await res.json();
+      // Read as text first so a non-JSON response (HTML fallback page, 404, etc.)
+      // gives a clear message instead of a cryptic JSON-parse error.
+      const raw = await res.text();
+      let data: any = null;
+      try {
+        data = raw ? JSON.parse(raw) : null;
+      } catch {
+        throw new Error(
+          res.ok
+            ? "The tweet server returned an unexpected (non-JSON) response. Is the backend running?"
+            : `Tweet import failed (HTTP ${res.status}). The /api/fetch-tweet backend route doesn't appear to be running.`
+        );
+      }
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to fetch tweet");
+        throw new Error(data?.error || `Failed to fetch tweet (HTTP ${res.status}).`);
       }
 
       setTweet(data);
     } catch (err: any) {
-      setErrorNotice(err.message || "Failed to import tweet link.");
+      setErrorNotice(err?.message || "Failed to import tweet link.");
     } finally {
       setIsLoading(false);
     }
