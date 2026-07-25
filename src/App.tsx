@@ -119,7 +119,8 @@ export default function App() {
       }
 
       if (!res.ok) {
-        throw new Error(data?.error || `Failed to fetch tweet (HTTP ${res.status}).`);
+        const base = data?.error || `Failed to fetch tweet (HTTP ${res.status}).`;
+        throw new Error(data?.detail ? `${base} — ${data.detail}` : base);
       }
 
       setTweet(data);
