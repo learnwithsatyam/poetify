@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import { extractTweetId, fetchTweetData } from "./api/_lib/tweet";
+import { extractTweetId, fetchTweetData } from "./lib/tweet";
 
 const app = express();
 const PORT = 3000;

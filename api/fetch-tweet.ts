@@ -1,6 +1,6 @@
 // Vercel serverless function: POST /api/fetch-tweet
 // Mirrors the Express route in server.ts but runs on Vercel's Node runtime.
-import { extractTweetId, fetchTweetData } from "./_lib/tweet";
+import { extractTweetId, fetchTweetData } from "../lib/tweet";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {

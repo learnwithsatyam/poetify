@@ -2,9 +2,15 @@
 // and the Vercel serverless functions (api/*.ts). Keeping it here means there is
 // a single source of truth for URL parsing and the API fallback chain.
 //
-// NOTE: the leading-underscore folder (`_lib`) is intentional — Vercel excludes
-// files/dirs starting with `_` from serverless-function detection, so this module
-// is imported by the real functions rather than being deployed as its own endpoint.
+// NOTE: this lives in a top-level `lib/` folder (NOT inside `api/`) on purpose.
+// Vercel only bundles code that a function imports if it can trace it reliably;
+// shared modules nested under `api/` (even underscore-prefixed) can fail to bundle
+// and crash the function at load time with "Cannot find module". A top-level
+// `lib/` import is the pattern Vercel documents for shared server code.
+
+// Abort external requests that hang so a slow upstream can't exhaust the
+// serverless function's execution time budget.
+const FETCH_TIMEOUT_MS = 6000;
 
 export interface NormalizedTweet {
   id: string;
@@ -69,6 +75,7 @@ export async function fetchTweetData(tweetId: string): Promise<FetchTweetResult>
   try {
     const fxRes = await fetch(`https://api.fxtwitter.com/status/${tweetId}`, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; Poetify/1.0)" },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
     if (fxRes.ok) {
@@ -129,7 +136,10 @@ export async function fetchTweetData(tweetId: string): Promise<FetchTweetResult>
   try {
     const synRes = await fetch(
       `https://cdn.syndication.twimg.com/tweet-result?id=${tweetId}&token=a`,
-      { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" } }
+      {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      }
     );
 
     if (synRes.ok) {
@@ -186,7 +196,7 @@ export async function fetchTweetData(tweetId: string): Promise<FetchTweetResult>
     const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(
       `https://x.com/x/status/${tweetId}`
     )}`;
-    const oRes = await fetch(oembedUrl);
+    const oRes = await fetch(oembedUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (oRes.ok) {
       const oData: any = await oRes.json();
       // Extract raw text from HTML string returned by oEmbed
