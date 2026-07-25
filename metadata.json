@@ -1,0 +1,6 @@
+{
+  "name": "Poetify - Tweet & Quote Studio",
+  "description": "Convert tweets and social posts into stunning, customizable studio-grade graphics with frosted glass & gradients.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
