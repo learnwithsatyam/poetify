@@ -2,7 +2,9 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import { extractTweetId, fetchTweetData } from "./lib/tweet";
+// The tweet logic lives in the Vercel function (which must be self-contained for
+// native-ESM deploys); the local Express dev server reuses the same exported helpers.
+import { extractTweetId, fetchTweetData } from "./api/fetch-tweet";
 
 const app = express();
 const PORT = 3000;
