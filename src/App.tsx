@@ -84,6 +84,28 @@ export default function App() {
     return Math.max(1, target.w / baseWidth);
   };
 
+  // Wait for fonts + every <img> inside the node to finish loading before capture.
+  // Capturing mid-load is the most common reason the exported image differs from
+  // the preview (blank avatar/media, or text reflowing once the real font lands).
+  const waitForAssets = async (node: HTMLElement) => {
+    try {
+      if ((document as any).fonts?.ready) await (document as any).fonts.ready;
+    } catch {
+      /* fonts API unavailable — ignore */
+    }
+    const imgs = Array.from(node.querySelectorAll("img"));
+    await Promise.all(
+      imgs.map((img) =>
+        img.complete && img.naturalWidth > 0
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              img.addEventListener("load", () => resolve(), { once: true });
+              img.addEventListener("error", () => resolve(), { once: true });
+            })
+      )
+    );
+  };
+
   // Load saved snaps from localStorage on mount
   useEffect(() => {
     try {
@@ -201,11 +223,10 @@ export default function App() {
 
     try {
       const node = canvasRef.current;
-      const dataUrl = await toPng(node, {
-        cacheBust: true,
-        pixelRatio: getExportPixelRatio(node),
-        quality: 0.98,
-      });
+      const opts = { cacheBust: true, pixelRatio: getExportPixelRatio(node), quality: 0.98 };
+      await waitForAssets(node);
+      await toPng(node, opts); // warm-up pass: first capture can miss late-loaded assets
+      const dataUrl = await toPng(node, opts);
 
       const link = document.createElement("a");
       link.download = `poetify-${tweet.author.handle || "tweet"}-${Date.now()}.png`;
@@ -245,12 +266,14 @@ export default function App() {
       // the click's user gesture. Awaiting toBlob() first (as before) drops that
       // activation and throws NotAllowedError — which is why copy "wasn't working".
       // Passing a Promise<Blob> to ClipboardItem keeps the write inside the gesture.
-      const blobPromise = toBlob(node, { cacheBust: true, pixelRatio, quality: 0.95 }).then(
-        (blob) => {
-          if (!blob) throw new Error("Failed to render image for clipboard");
-          return blob;
-        }
-      );
+      const opts = { cacheBust: true, pixelRatio, quality: 0.95 };
+      const blobPromise = (async () => {
+        await waitForAssets(node);
+        await toBlob(node, opts); // warm-up pass for asset/font reliability
+        const blob = await toBlob(node, opts);
+        if (!blob) throw new Error("Failed to render image for clipboard");
+        return blob;
+      })();
 
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blobPromise })]);
 
@@ -341,10 +364,10 @@ export default function App() {
 
         {/* Main Canvas Viewport / Stage */}
         <main className="flex-1 p-3 sm:p-6 lg:p-8 flex flex-col items-center justify-center relative min-h-[450px]">
-          {/* Top Canvas Toolbar Container (Responsive on mobile, absolute overlay on desktop) */}
-          <div className="w-full md:contents flex flex-wrap items-center justify-between gap-2 mb-3 z-20">
+          {/* Top Canvas Toolbar (single wrapping row so groups never overlap) */}
+          <div className="w-full flex flex-wrap items-center justify-between gap-2 mb-3 z-20">
             {/* Quick Visibility Toggles Bar */}
-            <div className="md:absolute md:top-4 md:left-4 z-20 flex items-center gap-1.5 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs overflow-x-auto max-w-full">
+            <div className="z-20 flex items-center gap-1.5 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs overflow-x-auto max-w-full">
               <span className="text-[10px] uppercase font-bold text-slate-400 px-2 tracking-wider hidden md:inline">
                 Quick Toggle:
               </span>
@@ -389,7 +412,7 @@ export default function App() {
             </div>
 
             {/* Aspect Ratio Switcher (always visible so output shape is easy to pick) */}
-            <div className="order-last w-full md:order-none md:w-auto md:absolute md:top-[4.5rem] lg:top-4 md:left-1/2 md:-translate-x-1/2 z-20 flex items-center gap-1 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs overflow-x-auto">
+            <div className="order-last w-full md:order-none md:w-auto z-20 flex items-center justify-center gap-1 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs overflow-x-auto">
               {RATIO_OPTIONS.map((ratio) => (
                 <button
                   key={ratio.id}
@@ -411,7 +434,7 @@ export default function App() {
             </div>
 
             {/* Stage Toolbar (Zoom Controls) */}
-            <div className="md:absolute md:top-4 md:right-4 z-20 flex items-center gap-1.5 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs ml-auto">
+            <div className="z-20 flex items-center gap-1.5 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs ml-auto md:ml-0">
               <button
                 onClick={() => setScale((s) => Math.max(0.5, s - 0.1))}
                 className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition"

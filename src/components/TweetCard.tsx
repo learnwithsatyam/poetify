@@ -239,7 +239,7 @@ export const TweetCard: React.FC<TweetCardProps> = ({
 
       {/* Main Tweet Card Container */}
       <div
-        className={`w-full max-w-xl mx-auto rounded-2xl transition-all duration-300 ${
+        className={`w-full mx-auto rounded-2xl transition-all duration-300 ${
           themeStyle.container
         } ${getShadowClass()} ${getFontClass()} ${
           config.border ? "border" : "border-0"
@@ -247,12 +247,14 @@ export const TweetCard: React.FC<TweetCardProps> = ({
         style={
           config.theme === "custom"
             ? {
+                maxWidth: `${config.cardWidth}px`,
                 backgroundColor: config.customCardBg,
                 color: config.customTextColor,
                 borderRadius: `${config.borderRadius}px`,
                 borderColor: config.borderColor,
               }
             : {
+                maxWidth: `${config.cardWidth}px`,
                 borderRadius: `${config.borderRadius}px`,
                 borderColor: config.borderColor,
               }

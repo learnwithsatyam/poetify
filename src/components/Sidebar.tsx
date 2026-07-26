@@ -396,6 +396,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
               />
             </div>
 
+            {/* Card Width Slider (size of the inner card within the canvas) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="font-semibold text-zinc-200">Card Width</label>
+                <span className="text-zinc-400 font-mono">{cardConfig.cardWidth}px</span>
+              </div>
+              <input
+                type="range"
+                min={320}
+                max={720}
+                step={8}
+                value={cardConfig.cardWidth}
+                onChange={(e) => onUpdateCard({ cardWidth: parseInt(e.target.value, 10) })}
+                className="w-full accent-rose-500 bg-zinc-800 h-1.5 rounded-lg appearance-none cursor-pointer"
+              />
+              <p className="text-[10px] text-zinc-500">Controls how large the tweet card is inside the canvas frame.</p>
+            </div>
+
             {/* Corner Radius Slider */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">

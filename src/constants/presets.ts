@@ -313,6 +313,7 @@ export const DEFAULT_CARD_CONFIG: CardConfig = {
   borderColor: "rgba(255, 255, 255, 0.12)",
   fontFamily: "sans",
   fontSize: 16,
+  cardWidth: 576,
   textAlignment: "left",
   showAvatar: true,
   showVerified: true,

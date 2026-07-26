@@ -60,6 +60,7 @@ export interface CardConfig {
   borderColor: string;
   fontFamily: FontOption;
   fontSize: number; // 12 to 24
+  cardWidth: number; // max width of the inner card in px (e.g. 320 to 720)
   textAlignment: "left" | "center";
   
   // Visibility toggles
