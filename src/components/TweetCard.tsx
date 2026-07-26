@@ -27,6 +27,9 @@ interface TweetCardProps {
   config: CardConfig;
   onUpdateTweet: (updated: Partial<TweetData>) => void;
   isInteractive?: boolean;
+  // CSS background of the canvas behind the card — used to build an export-safe
+  // frosted-glass backdrop (a real blurred layer instead of CSS backdrop-filter).
+  frostedBackdrop?: string;
 }
 
 export const TweetCard: React.FC<TweetCardProps> = ({
@@ -34,6 +37,7 @@ export const TweetCard: React.FC<TweetCardProps> = ({
   config,
   onUpdateTweet,
   isInteractive = true,
+  frostedBackdrop,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(tweet.text);
@@ -108,9 +112,10 @@ export const TweetCard: React.FC<TweetCardProps> = ({
           quoteBg: "bg-[#1e2732] border-slate-700",
         };
       case "glass":
+        // No backdrop-blur here — the frosted effect is built from real layers
+        // (see the glass backdrop block below) so it survives PNG export.
         return {
-          container:
-            "bg-zinc-950/40 backdrop-blur-xl text-white border border-white/20 shadow-2xl shadow-black/40",
+          container: "text-white border border-white/20 shadow-2xl shadow-black/40",
           text: "text-white",
           secondaryText: "text-zinc-300/80",
           metricIcon: "text-white/60 hover:text-white",
@@ -239,7 +244,7 @@ export const TweetCard: React.FC<TweetCardProps> = ({
 
       {/* Main Tweet Card Container */}
       <div
-        className={`w-full mx-auto rounded-2xl transition-all duration-300 ${
+        className={`relative overflow-hidden w-full mx-auto rounded-2xl transition-all duration-300 ${
           themeStyle.container
         } ${getShadowClass()} ${getFontClass()} ${
           config.border ? "border" : "border-0"
@@ -260,6 +265,25 @@ export const TweetCard: React.FC<TweetCardProps> = ({
               }
         }
       >
+        {/* Export-safe frosted glass: a real blurred backdrop layer using an
+            element-level `filter: blur()` (which html-to-image renders) instead
+            of CSS `backdrop-filter` (which it cannot capture). */}
+        {config.theme === "glass" && (
+          <>
+            <div
+              className="absolute inset-0 z-0 pointer-events-none"
+              style={{
+                background: frostedBackdrop || "rgb(24,24,37)",
+                transform: "scale(1.35)",
+                filter: "blur(32px) saturate(1.4)",
+              }}
+            />
+            <div className="absolute inset-0 z-0 pointer-events-none bg-zinc-950/40" />
+            <div className="absolute inset-0 z-0 pointer-events-none bg-gradient-to-b from-white/12 to-transparent" />
+          </>
+        )}
+
+        <div className="relative z-10">
         <div className="p-5 sm:p-6 flex flex-col gap-4">
           {/* Header Row: Author Avatar, Name, Handle, Twitter Logo */}
           <div className="flex items-start justify-between gap-3">
@@ -498,6 +522,7 @@ export const TweetCard: React.FC<TweetCardProps> = ({
             {config.watermarkText || "Created with Poetify"}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

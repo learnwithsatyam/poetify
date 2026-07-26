@@ -115,6 +115,11 @@ export const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
                 tweet={tweet}
                 config={cardConfig}
                 onUpdateTweet={onUpdateTweet}
+                frostedBackdrop={
+                  canvasConfig.bgType === "solid"
+                    ? canvasConfig.bgSolidColor
+                    : canvasConfig.bgGradient
+                }
               />
             </div>
           </div>
