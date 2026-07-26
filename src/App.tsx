@@ -4,13 +4,35 @@ import confetti from "canvas-confetti";
 import { ZoomIn, ZoomOut, Maximize2, Sparkles, Download, Copy, Bookmark, AlertCircle, Clock, BarChart2 } from "lucide-react";
 import { XLogo } from "./components/XLogo";
 
-import { CanvasConfig, CardConfig, SavedSnap, TweetData } from "./types";
+import { AspectRatio, CanvasConfig, CardConfig, SavedSnap, TweetData } from "./types";
 import {
   DEFAULT_CANVAS_CONFIG,
   DEFAULT_CARD_CONFIG,
   SAMPLE_TWEETS,
   STYLE_PRESETS,
 } from "./constants/presets";
+
+// Canonical output dimensions per aspect ratio. `h: null` = height follows the
+// content (Auto). Export renders at these exact pixel sizes so the final image is
+// predictable — what the dimensions readout shows is what you get.
+const OUTPUT_SIZES: Record<AspectRatio, { w: number; h: number | null }> = {
+  auto: { w: 1080, h: null },
+  "1:1": { w: 1080, h: 1080 },
+  "4:5": { w: 1080, h: 1350 },
+  "9:16": { w: 1080, h: 1920 },
+  "16:9": { w: 1600, h: 900 },
+  "4:3": { w: 1600, h: 1200 },
+  "3:1": { w: 1500, h: 500 },
+};
+
+// Compact, always-visible ratio switcher shown on the canvas toolbar.
+const RATIO_OPTIONS: { id: AspectRatio; label: string; hint: string }[] = [
+  { id: "auto", label: "Auto", hint: "Fit content" },
+  { id: "1:1", label: "Square", hint: "1:1" },
+  { id: "4:5", label: "Portrait", hint: "4:5" },
+  { id: "9:16", label: "Story", hint: "9:16" },
+  { id: "16:9", label: "Wide", hint: "16:9" },
+];
 import { Header } from "./components/Header";
 import { Canvas } from "./components/Canvas";
 import { Sidebar } from "./components/Sidebar";
@@ -31,8 +53,36 @@ export default function App() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isSavedModalOpen, setIsSavedModalOpen] = useState(false);
   const [savedSnaps, setSavedSnaps] = useState<SavedSnap[]>([]);
+  const [outputDims, setOutputDims] = useState<{ w: number; h: number }>({ w: 1080, h: 1080 });
 
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Keep a live readout of the exact pixel dimensions the exported image will have.
+  // A ResizeObserver catches every layout change (ratio, padding, font size, text length).
+  useEffect(() => {
+    const node = canvasRef.current;
+    if (!node) return;
+    const update = () => {
+      const target = OUTPUT_SIZES[canvasConfig.aspectRatio] || OUTPUT_SIZES.auto;
+      const ow = node.offsetWidth || 1;
+      const oh = node.offsetHeight || 1;
+      const w = target.w;
+      const h = target.h ?? Math.round(w * (oh / ow));
+      setOutputDims({ w, h });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, [canvasConfig.aspectRatio]);
+
+  // The render scale that makes html-to-image emit the canonical output width above,
+  // regardless of the on-screen zoom or viewport size.
+  const getExportPixelRatio = (node: HTMLElement): number => {
+    const target = OUTPUT_SIZES[canvasConfig.aspectRatio] || OUTPUT_SIZES.auto;
+    const baseWidth = node.offsetWidth || 768;
+    return Math.max(1, target.w / baseWidth);
+  };
 
   // Load saved snaps from localStorage on mount
   useEffect(() => {
@@ -150,9 +200,10 @@ export default function App() {
     setIsExporting(true);
 
     try {
-      const dataUrl = await toPng(canvasRef.current, {
+      const node = canvasRef.current;
+      const dataUrl = await toPng(node, {
         cacheBust: true,
-        pixelRatio: 2.5, // 2.5x crisp studio resolution
+        pixelRatio: getExportPixelRatio(node),
         quality: 0.98,
       });
 
@@ -177,33 +228,53 @@ export default function App() {
   // Copy Image Blob directly to Clipboard
   const handleCopyClipboard = async () => {
     if (!canvasRef.current) return;
+    const node = canvasRef.current;
     setIsCopying(true);
+    setErrorNotice(null);
+
+    const pixelRatio = getExportPixelRatio(node);
 
     try {
-      const blob = await toBlob(canvasRef.current, {
-        cacheBust: true,
-        pixelRatio: 2,
-        quality: 0.95,
-      });
-
-      if (blob && navigator.clipboard) {
-        await navigator.clipboard.write([
-          new ClipboardItem({
-            "image/png": blob,
-          }),
-        ]);
-
-        confetti({
-          particleCount: 40,
-          spread: 50,
-          origin: { y: 0.7 },
-        });
-      } else {
-        throw new Error("Clipboard API not supported in this browser environment");
+      const canWriteImage =
+        typeof ClipboardItem !== "undefined" && !!navigator.clipboard?.write;
+      if (!canWriteImage) {
+        throw new Error("Clipboard image API not supported");
       }
+
+      // Safari/WebKit requires clipboard.write() to be called synchronously within
+      // the click's user gesture. Awaiting toBlob() first (as before) drops that
+      // activation and throws NotAllowedError — which is why copy "wasn't working".
+      // Passing a Promise<Blob> to ClipboardItem keeps the write inside the gesture.
+      const blobPromise = toBlob(node, { cacheBust: true, pixelRatio, quality: 0.95 }).then(
+        (blob) => {
+          if (!blob) throw new Error("Failed to render image for clipboard");
+          return blob;
+        }
+      );
+
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blobPromise })]);
+
+      confetti({
+        particleCount: 40,
+        spread: 50,
+        origin: { y: 0.7 },
+      });
     } catch (err: any) {
-      console.warn("Clipboard copy blocked:", err);
-      setErrorNotice("Direct clipboard copying is restricted by your browser context. Please click 'Export PNG' to download the image file.");
+      // Fall back to downloading the PNG so the user still gets the image.
+      console.warn("Clipboard copy failed, falling back to download:", err);
+      try {
+        const dataUrl = await toPng(node, { cacheBust: true, pixelRatio, quality: 0.98 });
+        const link = document.createElement("a");
+        link.download = `poetify-${tweet.author.handle || "tweet"}-${Date.now()}.png`;
+        link.href = dataUrl;
+        link.click();
+        setErrorNotice(
+          "Your browser blocked copying images to the clipboard, so the image was downloaded instead."
+        );
+      } catch (dlErr) {
+        console.error("Fallback export failed:", dlErr);
+        setErrorNotice("Couldn't copy or download the image. Try the Export PNG button.");
+      }
     } finally {
       setIsCopying(false);
     }
@@ -317,6 +388,28 @@ export default function App() {
               </button>
             </div>
 
+            {/* Aspect Ratio Switcher (always visible so output shape is easy to pick) */}
+            <div className="order-last w-full md:order-none md:w-auto md:absolute md:top-[4.5rem] lg:top-4 md:left-1/2 md:-translate-x-1/2 z-20 flex items-center gap-1 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs overflow-x-auto">
+              {RATIO_OPTIONS.map((ratio) => (
+                <button
+                  key={ratio.id}
+                  onClick={() => setCanvasConfig((prev) => ({ ...prev, aspectRatio: ratio.id }))}
+                  title={`${ratio.label} — ${ratio.hint}`}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition shrink-0 ${
+                    canvasConfig.aspectRatio === ratio.id
+                      ? "bg-rose-500/20 text-rose-300 border border-rose-400/40 font-semibold shadow-sm"
+                      : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+                  }`}
+                >
+                  <span>{ratio.label}</span>
+                </button>
+              ))}
+              <div className="w-px h-4 bg-white/10 mx-0.5 hidden sm:block" />
+              <span className="px-1.5 font-mono text-[10px] text-slate-400 whitespace-nowrap hidden sm:inline">
+                {outputDims.w}×{outputDims.h}
+              </span>
+            </div>
+
             {/* Stage Toolbar (Zoom Controls) */}
             <div className="md:absolute md:top-4 md:right-4 z-20 flex items-center gap-1.5 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs ml-auto">
               <button
@@ -393,7 +486,9 @@ export default function App() {
           </span>
         </div>
         <div className="flex items-center gap-3 font-mono text-[10px]">
-          <span>Format: PNG (2.5x HD)</span>
+          <span>
+            Output: {outputDims.w} × {outputDims.h} px · PNG
+          </span>
         </div>
       </footer>
 
