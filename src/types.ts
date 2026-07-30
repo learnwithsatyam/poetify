@@ -32,15 +32,40 @@ export interface TweetData {
 
 export type AspectRatio = "auto" | "1:1" | "16:9" | "9:16" | "4:3" | "4:5" | "3:1";
 
-export type CardTheme = "light" | "dark" | "dim" | "glass" | "obsidian" | "paper" | "custom";
+export type CardTheme =
+  | "light"
+  | "dark"
+  | "dim"
+  | "glass"
+  | "gradient"
+  | "obsidian"
+  | "paper"
+  | "custom";
 
 export type FontOption = "sans" | "serif" | "mono" | "display" | "handwriting";
 
 export type CardShadow = "none" | "soft" | "medium" | "heavy" | "glow" | "elevated";
 
+/**
+ * How the card sits inside the exported image.
+ *  - "canvas": the card floats on a padded background frame (the classic look).
+ *  - "bare":   the frame is removed and the card *is* the image, edge to edge.
+ */
+export type FrameMode = "canvas" | "bare";
+
+/**
+ * Which body the card renders.
+ *  - "tweet":  full X/Twitter card — avatar, handle, metrics, timestamp.
+ *  - "poster": big typographic quote graphic (Instagram quote-post style).
+ */
+export type CardLayout = "tweet" | "poster";
+
+export type PosterMark = "none" | "glyph" | "bar";
+
 export interface CanvasConfig {
   aspectRatio: AspectRatio;
-  padding: number; // in pixels (e.g. 16 to 120)
+  frameMode: FrameMode;
+  padding: number; // in pixels (e.g. 16 to 120). In "bare" mode this is the card's own inset.
   bgType: "gradient" | "solid" | "pattern" | "image";
   bgGradient: string; // Tailwind or CSS gradient string
   bgSolidColor: string;
@@ -51,6 +76,7 @@ export interface CanvasConfig {
 }
 
 export interface CardConfig {
+  layout: CardLayout;
   theme: CardTheme;
   customCardBg: string;
   customTextColor: string;
@@ -63,6 +89,13 @@ export interface CardConfig {
   cardWidth: number; // max width of the inner card in px (e.g. 320 to 720)
   textAlignment: "left" | "center";
   
+  // Poster layout (quote graphic) settings
+  posterFontSize: number; // 24 to 80
+  posterAutoFit: boolean; // shrink the quote automatically as the text gets longer
+  posterMark: PosterMark; // decoration above the quote
+  posterInsetBorder: boolean; // hairline frame inset from the card edge
+  showAttribution: boolean; // "— Name / @handle" line under the quote
+
   // Visibility toggles
   showAvatar: boolean;
   showVerified: boolean;
@@ -73,7 +106,7 @@ export interface CardConfig {
   showQuote: boolean;
   showWatermark: boolean;
   watermarkText: string;
-  
+
   // Custom metrics overrides
   metricFormat: "compact" | "full"; // e.g. 12.4K vs 12,400
 }
@@ -91,7 +124,7 @@ export interface SavedSnap {
 export interface StylePreset {
   id: string;
   name: string;
-  category: "classic" | "vibrant" | "dark" | "minimal" | "retro";
+  category: "classic" | "vibrant" | "dark" | "minimal" | "retro" | "quote";
   canvasConfig: Partial<CanvasConfig>;
   cardConfig: Partial<CardConfig>;
 }

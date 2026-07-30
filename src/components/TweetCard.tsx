@@ -14,7 +14,14 @@ import {
   Upload,
 } from "lucide-react";
 import { XLogo } from "./XLogo";
+import { GlassBackdrop } from "./GlassBackdrop";
 import { CardConfig, TweetData } from "../types";
+import {
+  getCardSurfaceStyle,
+  getCardThemeStyle,
+  getFontClass,
+  getShadowClass,
+} from "../utils/cardTheme";
 import {
   formatCompactNumber,
   formatFullNumber,
@@ -27,9 +34,14 @@ interface TweetCardProps {
   config: CardConfig;
   onUpdateTweet: (updated: Partial<TweetData>) => void;
   isInteractive?: boolean;
-  // CSS background of the canvas behind the card — used to build an export-safe
-  // frosted-glass backdrop (a real blurred layer instead of CSS backdrop-filter).
-  frostedBackdrop?: string;
+  // CSS background of the canvas behind the card — used both for the export-safe
+  // frosted-glass backdrop and by the "gradient" theme.
+  canvasBackground?: string;
+  // Bare-frame mode: the card stretches to become the whole exported image.
+  fill?: boolean;
+  // Overrides the card's built-in content padding (bare mode drives this from
+  // the padding slider, since there is no canvas frame left to pad).
+  contentPadding?: number;
 }
 
 export const TweetCard: React.FC<TweetCardProps> = ({
@@ -37,7 +49,9 @@ export const TweetCard: React.FC<TweetCardProps> = ({
   config,
   onUpdateTweet,
   isInteractive = true,
-  frostedBackdrop,
+  canvasBackground,
+  fill = false,
+  contentPadding,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(tweet.text);
@@ -90,116 +104,9 @@ export const TweetCard: React.FC<TweetCardProps> = ({
     setIsEditing(false);
   };
 
-  // Theme Styling Classes & Inline CSS
-  const getThemeStyles = () => {
-    switch (config.theme) {
-      case "light":
-        return {
-          container: "bg-white text-zinc-900 border border-zinc-200/80 shadow-2xl",
-          text: "text-zinc-900",
-          secondaryText: "text-zinc-500",
-          metricIcon: "text-zinc-400 hover:text-zinc-600",
-          borderStyle: "border-zinc-200/80",
-          quoteBg: "bg-zinc-50 border-zinc-200",
-        };
-      case "dim":
-        return {
-          container: "bg-[#15202b] text-slate-100 border border-slate-700/60 shadow-2xl",
-          text: "text-slate-100",
-          secondaryText: "text-slate-400",
-          metricIcon: "text-slate-400 hover:text-slate-200",
-          borderStyle: "border-slate-700/60",
-          quoteBg: "bg-[#1e2732] border-slate-700",
-        };
-      case "glass":
-        // No backdrop-blur here — the frosted effect is built from real layers
-        // (see the glass backdrop block below) so it survives PNG export.
-        return {
-          container: "text-white border border-white/20 shadow-2xl shadow-black/40",
-          text: "text-white",
-          secondaryText: "text-zinc-300/80",
-          metricIcon: "text-white/60 hover:text-white",
-          borderStyle: "border-white/15",
-          quoteBg: "bg-white/5 border-white/10",
-        };
-      case "paper":
-        return {
-          container: "bg-[#fbf7ee] text-[#2c2416] border border-[#e2d5c3] shadow-xl",
-          text: "text-[#2c2416]",
-          secondaryText: "text-[#7a6b57]",
-          metricIcon: "text-[#8c7a65]",
-          borderStyle: "border-[#e2d5c3]",
-          quoteBg: "bg-[#f2e9d8] border-[#e2d5c3]",
-        };
-      case "obsidian":
-        return {
-          container: "bg-[#09090b] text-zinc-100 border border-zinc-800 shadow-2xl",
-          text: "text-zinc-100",
-          secondaryText: "text-zinc-500",
-          metricIcon: "text-zinc-500 hover:text-zinc-300",
-          borderStyle: "border-zinc-800",
-          quoteBg: "bg-zinc-900 border-zinc-800",
-        };
-      case "custom":
-        return {
-          container: "shadow-2xl",
-          text: "",
-          secondaryText: "opacity-70",
-          metricIcon: "opacity-70",
-          borderStyle: "border-current/20",
-          quoteBg: "bg-black/10 border-current/20",
-        };
-      case "dark":
-      default:
-        return {
-          container: "bg-zinc-950 text-zinc-100 border border-zinc-800/90 shadow-2xl",
-          text: "text-zinc-100",
-          secondaryText: "text-zinc-400",
-          metricIcon: "text-zinc-500 hover:text-zinc-300",
-          borderStyle: "border-zinc-800",
-          quoteBg: "bg-zinc-900/80 border-zinc-800",
-        };
-    }
-  };
-
-  const themeStyle = getThemeStyles();
-
-  // Shadow class mapping
-  const getShadowClass = () => {
-    switch (config.shadow) {
-      case "none":
-        return "shadow-none";
-      case "soft":
-        return "shadow-lg shadow-black/10";
-      case "medium":
-        return "shadow-xl shadow-black/20";
-      case "heavy":
-        return "shadow-2xl shadow-black/50";
-      case "glow":
-        return "shadow-[0_0_50px_rgba(244,63,94,0.25)]";
-      case "elevated":
-        return "shadow-[0_20px_60px_-15px_rgba(0,0,0,0.6)]";
-      default:
-        return "shadow-2xl";
-    }
-  };
-
-  // Font family mapping
-  const getFontClass = () => {
-    switch (config.fontFamily) {
-      case "serif":
-        return "font-serif tracking-normal";
-      case "mono":
-        return "font-mono tracking-tight";
-      case "display":
-        return "font-sans font-medium tracking-tight";
-      case "handwriting":
-        return "font-serif italic";
-      case "sans":
-      default:
-        return "font-sans tracking-normal";
-    }
-  };
+  const themeStyle = getCardThemeStyle(config.theme);
+  // A drop shadow has nothing to fall onto once the card is the whole image.
+  const shadowClass = fill ? "shadow-none" : getShadowClass(config.shadow);
 
   // Format hashtags and mentions
   const renderFormattedText = (content: string) => {
@@ -231,7 +138,7 @@ export const TweetCard: React.FC<TweetCardProps> = ({
   const proxiedAvatar = tweet.author.avatar ? getProxiedImageUrl(tweet.author.avatar) : "";
 
   return (
-    <div className="relative group/card">
+    <div className={`relative group/card ${fill ? "w-full h-full" : ""}`}>
       {/* Inline Quick Edit Toggle Button */}
       {isInteractive && !isEditing && (
         <button
@@ -246,45 +153,20 @@ export const TweetCard: React.FC<TweetCardProps> = ({
       <div
         className={`relative overflow-hidden w-full mx-auto rounded-2xl transition-all duration-300 ${
           themeStyle.container
-        } ${getShadowClass()} ${getFontClass()} ${
+        } ${shadowClass} ${getFontClass(config.fontFamily)} ${
           config.border ? "border" : "border-0"
         }`}
-        style={
-          config.theme === "custom"
-            ? {
-                maxWidth: `${config.cardWidth}px`,
-                backgroundColor: config.customCardBg,
-                color: config.customTextColor,
-                borderRadius: `${config.borderRadius}px`,
-                borderColor: config.borderColor,
-              }
-            : {
-                maxWidth: `${config.cardWidth}px`,
-                borderRadius: `${config.borderRadius}px`,
-                borderColor: config.borderColor,
-              }
-        }
+        style={getCardSurfaceStyle(config, canvasBackground, fill)}
       >
-        {/* Export-safe frosted glass: a real blurred backdrop layer using an
-            element-level `filter: blur()` (which html-to-image renders) instead
-            of CSS `backdrop-filter` (which it cannot capture). */}
-        {config.theme === "glass" && (
-          <>
-            <div
-              className="absolute inset-0 z-0 pointer-events-none"
-              style={{
-                background: frostedBackdrop || "rgb(24,24,37)",
-                transform: "scale(1.35)",
-                filter: "blur(32px) saturate(1.4)",
-              }}
-            />
-            <div className="absolute inset-0 z-0 pointer-events-none bg-zinc-950/40" />
-            <div className="absolute inset-0 z-0 pointer-events-none bg-gradient-to-b from-white/12 to-transparent" />
-          </>
-        )}
+        {config.theme === "glass" && <GlassBackdrop background={canvasBackground} />}
 
-        <div className="relative z-10">
-        <div className="p-5 sm:p-6 flex flex-col gap-4">
+        <div className={`relative z-10 ${fill ? "h-full flex flex-col" : ""}`}>
+        <div
+          className={`flex flex-col gap-4 ${fill ? "flex-1 justify-center" : ""} ${
+            contentPadding === undefined ? "p-5 sm:p-6" : ""
+          }`}
+          style={contentPadding === undefined ? undefined : { padding: `${contentPadding}px` }}
+        >
           {/* Header Row: Author Avatar, Name, Handle, Twitter Logo */}
           <div className="flex items-start justify-between gap-3">
             <input

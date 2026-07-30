@@ -1,7 +1,24 @@
 import React, { useState, useRef, useEffect } from "react";
 import { toPng, toBlob } from "html-to-image";
 import confetti from "canvas-confetti";
-import { ZoomIn, ZoomOut, Maximize2, Sparkles, Download, Copy, Bookmark, AlertCircle, Clock, BarChart2 } from "lucide-react";
+import {
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Download,
+  Copy,
+  AlertCircle,
+  Clock,
+  BarChart2,
+  Frame,
+  Expand,
+  MessageSquare,
+  Quote,
+  User,
+  Type,
+  Camera,
+  PenLine,
+} from "lucide-react";
 import { XLogo } from "./components/XLogo";
 
 import { AspectRatio, CanvasConfig, CardConfig, SavedSnap, TweetData } from "./types";
@@ -33,6 +50,35 @@ const RATIO_OPTIONS: { id: AspectRatio; label: string; hint: string }[] = [
   { id: "9:16", label: "Story", hint: "9:16" },
   { id: "16:9", label: "Wide", hint: "16:9" },
 ];
+
+// Quick toggles on the canvas toolbar. Each layout exposes the handful of
+// switches that actually mean something for it.
+type ToggleKey = Extract<
+  {
+    [K in keyof CardConfig]: CardConfig[K] extends boolean ? K : never;
+  }[keyof CardConfig],
+  string
+>;
+
+interface QuickToggle {
+  key: ToggleKey;
+  label: string;
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const TWEET_TOGGLES: QuickToggle[] = [
+  { key: "showTimestamp", label: "Date & Time", title: "Show or hide date & timestamp", icon: Clock },
+  { key: "showMetrics", label: "Metrics", title: "Show or hide engagement metrics", icon: BarChart2 },
+  { key: "showTwitterLogo", label: "X Logo", title: "Show or hide the X logo", icon: XLogo },
+];
+
+const POSTER_TOGGLES: QuickToggle[] = [
+  { key: "showAttribution", label: "Attribution", title: "Show or hide the author line", icon: User },
+  { key: "showAvatar", label: "Avatar", title: "Show or hide the author photo", icon: Camera },
+  { key: "showTwitterLogo", label: "X Logo", title: "Show or hide the X logo", icon: XLogo },
+  { key: "showWatermark", label: "Signature", title: "Show or hide the footer signature", icon: PenLine },
+];
 import { Header } from "./components/Header";
 import { Canvas } from "./components/Canvas";
 import { Sidebar } from "./components/Sidebar";
@@ -56,6 +102,9 @@ export default function App() {
   const [outputDims, setOutputDims] = useState<{ w: number; h: number }>({ w: 1080, h: 1080 });
 
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  const isPoster = cardConfig.layout === "poster";
+  const isBare = canvasConfig.frameMode === "bare";
 
   // Keep a live readout of the exact pixel dimensions the exported image will have.
   // A ResizeObserver catches every layout change (ratio, padding, font size, text length).
@@ -151,8 +200,10 @@ export default function App() {
 
   const handleLoadSnap = (snap: SavedSnap) => {
     setTweet(snap.tweetData);
-    setCanvasConfig(snap.canvasConfig);
-    setCardConfig(snap.cardConfig);
+    // Merge over the defaults so snaps saved before a config field existed
+    // (frame mode, poster settings, …) still load into a complete config.
+    setCanvasConfig({ ...DEFAULT_CANVAS_CONFIG, ...snap.canvasConfig });
+    setCardConfig({ ...DEFAULT_CARD_CONFIG, ...snap.cardConfig });
   };
 
   // Import Tweet from URL API
@@ -364,102 +415,156 @@ export default function App() {
 
         {/* Main Canvas Viewport / Stage */}
         <main className="flex-1 p-3 sm:p-6 lg:p-8 flex flex-col items-center justify-center relative min-h-[450px]">
-          {/* Top Canvas Toolbar (single wrapping row so groups never overlap) */}
-          <div className="w-full flex flex-wrap items-center justify-between gap-2 mb-3 z-20">
-            {/* Quick Visibility Toggles Bar */}
-            <div className="z-20 flex items-center gap-1.5 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs overflow-x-auto max-w-full">
+          {/* Top Canvas Toolbar — two rows so groups never overlap */}
+          <div className="w-full flex flex-col gap-2 mb-3 z-20">
+            <div className="w-full flex flex-wrap items-center justify-between gap-2">
+              {/* Layout + Frame Mode Switcher */}
+              <div className="z-20 flex items-center gap-1 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs overflow-x-auto max-w-full">
+                <button
+                  onClick={() => setCardConfig((prev) => ({ ...prev, layout: "tweet" }))}
+                  title="Render the full tweet card"
+                  className={`px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition shrink-0 border ${
+                    !isPoster
+                      ? "bg-indigo-600/30 text-indigo-300 border-indigo-400/30 font-semibold shadow-sm"
+                      : "text-slate-400 hover:text-white hover:bg-white/5 border-transparent"
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Tweet Card</span>
+                </button>
+                <button
+                  onClick={() => setCardConfig((prev) => ({ ...prev, layout: "poster" }))}
+                  title="Render a big typographic quote graphic"
+                  className={`px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition shrink-0 border ${
+                    isPoster
+                      ? "bg-indigo-600/30 text-indigo-300 border-indigo-400/30 font-semibold shadow-sm"
+                      : "text-slate-400 hover:text-white hover:bg-white/5 border-transparent"
+                  }`}
+                >
+                  <Quote className="w-3.5 h-3.5" />
+                  <span>Quote Poster</span>
+                </button>
+
+                <div className="w-px h-4 bg-white/10 mx-1" />
+
+                <button
+                  onClick={() =>
+                    setCanvasConfig((prev) => ({
+                      ...prev,
+                      frameMode: prev.frameMode === "bare" ? "canvas" : "bare",
+                    }))
+                  }
+                  title={
+                    isBare
+                      ? "Card only — the card fills the whole image"
+                      : "Canvas frame — the card floats on a padded background"
+                  }
+                  className={`px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition shrink-0 border ${
+                    isBare
+                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-400/40 font-semibold shadow-sm"
+                      : "text-slate-400 hover:text-white hover:bg-white/5 border-transparent"
+                  }`}
+                >
+                  {isBare ? <Expand className="w-3.5 h-3.5" /> : <Frame className="w-3.5 h-3.5" />}
+                  <span>{isBare ? "Card Only" : "Canvas Frame"}</span>
+                </button>
+              </div>
+
+              {/* Aspect Ratio Switcher (always visible so output shape is easy to pick) */}
+              <div className="order-last w-full md:order-none md:w-auto z-20 flex items-center justify-center gap-1 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs overflow-x-auto">
+                {RATIO_OPTIONS.map((ratio) => (
+                  <button
+                    key={ratio.id}
+                    onClick={() => setCanvasConfig((prev) => ({ ...prev, aspectRatio: ratio.id }))}
+                    title={`${ratio.label} — ${ratio.hint}`}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition shrink-0 ${
+                      canvasConfig.aspectRatio === ratio.id
+                        ? "bg-rose-500/20 text-rose-300 border border-rose-400/40 font-semibold shadow-sm"
+                        : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+                    }`}
+                  >
+                    <span>{ratio.label}</span>
+                  </button>
+                ))}
+                <div className="w-px h-4 bg-white/10 mx-0.5 hidden sm:block" />
+                <span className="px-1.5 font-mono text-[10px] text-slate-400 whitespace-nowrap hidden sm:inline">
+                  {outputDims.w}×{outputDims.h}
+                </span>
+              </div>
+
+              {/* Stage Toolbar (Zoom Controls) */}
+              <div className="z-20 flex items-center gap-1.5 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs ml-auto md:ml-0">
+                <button
+                  onClick={() => setScale((s) => Math.max(0.5, s - 0.1))}
+                  className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition"
+                  title="Zoom Out"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+                <span className="px-2 font-mono text-[11px] text-slate-400 font-semibold">
+                  {Math.round(scale * 100)}%
+                </span>
+                <button
+                  onClick={() => setScale((s) => Math.min(1.3, s + 0.1))}
+                  className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition"
+                  title="Zoom In"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                <div className="w-px h-4 bg-white/10 mx-0.5" />
+                <button
+                  onClick={() => setScale(1)}
+                  className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition"
+                  title="Reset Zoom"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Visibility Toggles Bar — follows the active layout */}
+            <div className="z-20 flex items-center gap-1.5 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs overflow-x-auto max-w-full w-fit">
               <span className="text-[10px] uppercase font-bold text-slate-400 px-2 tracking-wider hidden md:inline">
                 Quick Toggle:
               </span>
-              <button
-                onClick={() => setCardConfig((prev) => ({ ...prev, showTimestamp: !prev.showTimestamp }))}
-                className={`px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition shrink-0 ${
-                  cardConfig.showTimestamp
-                    ? "bg-indigo-600/30 text-indigo-300 border border-indigo-400/30 font-semibold shadow-sm"
-                    : "text-slate-400 hover:text-white hover:bg-white/5"
-                }`}
-                title="Show or Hide Date & Timestamp"
-              >
-                <Clock className="w-3.5 h-3.5" />
-                <span>Date & Time</span>
-              </button>
-
-              <button
-                onClick={() => setCardConfig((prev) => ({ ...prev, showMetrics: !prev.showMetrics }))}
-                className={`px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition shrink-0 ${
-                  cardConfig.showMetrics
-                    ? "bg-indigo-600/30 text-indigo-300 border border-indigo-400/30 font-semibold shadow-sm"
-                    : "text-slate-400 hover:text-white hover:bg-white/5"
-                }`}
-                title="Show or Hide Engagement Metrics"
-              >
-                <BarChart2 className="w-3.5 h-3.5" />
-                <span>Metrics</span>
-              </button>
-
-              <button
-                onClick={() => setCardConfig((prev) => ({ ...prev, showTwitterLogo: !prev.showTwitterLogo }))}
-                className={`px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition shrink-0 ${
-                  cardConfig.showTwitterLogo
-                    ? "bg-indigo-600/30 text-indigo-300 border border-indigo-400/30 font-semibold shadow-sm"
-                    : "text-slate-400 hover:text-white hover:bg-white/5"
-                }`}
-                title="Show or Hide X Logo"
-              >
-                <XLogo className="w-3.5 h-3.5" />
-                <span>X Logo</span>
-              </button>
-            </div>
-
-            {/* Aspect Ratio Switcher (always visible so output shape is easy to pick) */}
-            <div className="order-last w-full md:order-none md:w-auto z-20 flex items-center justify-center gap-1 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs overflow-x-auto">
-              {RATIO_OPTIONS.map((ratio) => (
+              {(isPoster ? POSTER_TOGGLES : TWEET_TOGGLES).map((toggle) => (
                 <button
-                  key={ratio.id}
-                  onClick={() => setCanvasConfig((prev) => ({ ...prev, aspectRatio: ratio.id }))}
-                  title={`${ratio.label} — ${ratio.hint}`}
+                  key={toggle.key}
+                  onClick={() =>
+                    setCardConfig(
+                      (prev) => ({ ...prev, [toggle.key]: !prev[toggle.key] } as CardConfig)
+                    )
+                  }
                   className={`px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition shrink-0 ${
-                    canvasConfig.aspectRatio === ratio.id
-                      ? "bg-rose-500/20 text-rose-300 border border-rose-400/40 font-semibold shadow-sm"
+                    cardConfig[toggle.key]
+                      ? "bg-indigo-600/30 text-indigo-300 border border-indigo-400/30 font-semibold shadow-sm"
                       : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
                   }`}
+                  title={toggle.title}
                 >
-                  <span>{ratio.label}</span>
+                  <toggle.icon className="w-3.5 h-3.5" />
+                  <span>{toggle.label}</span>
                 </button>
               ))}
-              <div className="w-px h-4 bg-white/10 mx-0.5 hidden sm:block" />
-              <span className="px-1.5 font-mono text-[10px] text-slate-400 whitespace-nowrap hidden sm:inline">
-                {outputDims.w}×{outputDims.h}
-              </span>
-            </div>
 
-            {/* Stage Toolbar (Zoom Controls) */}
-            <div className="z-20 flex items-center gap-1.5 bg-white/5 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-xl text-xs ml-auto md:ml-0">
-              <button
-                onClick={() => setScale((s) => Math.max(0.5, s - 0.1))}
-                className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition"
-                title="Zoom Out"
-              >
-                <ZoomOut className="w-4 h-4" />
-              </button>
-              <span className="px-2 font-mono text-[11px] text-slate-400 font-semibold">
-                {Math.round(scale * 100)}%
-              </span>
-              <button
-                onClick={() => setScale((s) => Math.min(1.3, s + 0.1))}
-                className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition"
-                title="Zoom In"
-              >
-                <ZoomIn className="w-4 h-4" />
-              </button>
-              <div className="w-px h-4 bg-white/10 mx-0.5" />
-              <button
-                onClick={() => setScale(1)}
-                className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition"
-                title="Reset Zoom"
-              >
-                <Maximize2 className="w-4 h-4" />
-              </button>
+              {isPoster && (
+                <>
+                  <div className="w-px h-4 bg-white/10 mx-0.5" />
+                  <button
+                    onClick={() =>
+                      setCardConfig((prev) => ({
+                        ...prev,
+                        textAlignment: prev.textAlignment === "center" ? "left" : "center",
+                      }))
+                    }
+                    className="px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition shrink-0 text-slate-300 hover:text-white hover:bg-white/5 border border-transparent capitalize"
+                    title="Toggle quote alignment"
+                  >
+                    <Type className="w-3.5 h-3.5" />
+                    <span>{cardConfig.textAlignment}</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -505,7 +610,7 @@ export default function App() {
           </span>
           <span className="hidden sm:inline-block text-slate-600">|</span>
           <span className="hidden sm:inline-block text-slate-400">
-            Frosted Glass Rendering Engine
+            {isPoster ? "Quote Poster" : "Tweet Card"} · {isBare ? "Card Only" : "Canvas Frame"}
           </span>
         </div>
         <div className="flex items-center gap-3 font-mono text-[10px]">

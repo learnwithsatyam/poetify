@@ -17,8 +17,23 @@ import {
   Upload,
   User,
   BadgeCheck,
+  Frame,
+  Expand,
+  Quote,
+  MessageSquare,
+  AlignLeft,
+  AlignCenter,
+  Minus,
 } from "lucide-react";
-import { AspectRatio, CanvasConfig, CardConfig, CardTheme, FontOption, TweetData } from "../types";
+import {
+  AspectRatio,
+  CanvasConfig,
+  CardConfig,
+  CardTheme,
+  FontOption,
+  PosterMark,
+  TweetData,
+} from "../types";
 import { GRADIENT_PRESETS, STYLE_PRESETS } from "../constants/presets";
 
 interface SidebarProps {
@@ -78,11 +93,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "dark", label: "Dark", color: "bg-zinc-950 border-zinc-700" },
     { id: "light", label: "Light", color: "bg-white border-zinc-300 text-zinc-900" },
     { id: "glass", label: "Glass", color: "bg-zinc-900/60 backdrop-blur border-white/30" },
+    { id: "gradient", label: "Gradient Fill", color: "bg-gradient-to-r from-indigo-500 to-fuchsia-500 border-white/30" },
     { id: "dim", label: "Dim Navy", color: "bg-[#15202b] border-slate-600" },
     { id: "obsidian", label: "Obsidian", color: "bg-black border-zinc-800" },
     { id: "paper", label: "Paper", color: "bg-[#fbf7ee] text-[#2c2416] border-[#e2d5c3]" },
     { id: "custom", label: "Custom", color: "bg-gradient-to-r from-purple-500 to-pink-500" },
   ];
+
+  const isPoster = cardConfig.layout === "poster";
+  const isBare = canvasConfig.frameMode === "bare";
+
+  const posterMarks: { id: PosterMark; label: string }[] = [
+    { id: "none", label: "None" },
+    { id: "glyph", label: "Quote “" },
+    { id: "bar", label: "Accent Bar" },
+  ];
+
+  const tweetPresets = STYLE_PRESETS.filter((p) => p.cardConfig?.layout !== "poster");
+  const posterPresets = STYLE_PRESETS.filter((p) => p.cardConfig?.layout === "poster");
+
+  const renderPresetButton = (p: (typeof STYLE_PRESETS)[number]) => (
+    <button
+      key={p.id}
+      onClick={() => onApplyPreset(p.id)}
+      className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-indigo-500/50 hover:bg-white/10 transition text-left flex items-center justify-between group shadow-sm backdrop-blur-md"
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className="w-10 h-10 rounded-xl shadow-inner flex items-center justify-center shrink-0 border border-white/20"
+          style={{
+            background: p.canvasConfig?.bgGradient || "#18181b",
+          }}
+        >
+          {p.cardConfig?.layout === "poster" ? (
+            <Quote className="w-4 h-4 text-white/70" />
+          ) : (
+            <div className="w-5 h-5 rounded-md bg-white/20 backdrop-blur border border-white/30" />
+          )}
+        </div>
+        <div>
+          <div className="font-semibold text-slate-100 group-hover:text-indigo-300 transition">
+            {p.name}
+          </div>
+          <div className="text-[10px] text-slate-400 capitalize">
+            {p.canvasConfig?.frameMode === "bare" ? "Card only" : "Canvas frame"} •{" "}
+            {p.cardConfig?.theme || "dark"} card
+          </div>
+        </div>
+      </div>
+      <Check className="w-4 h-4 text-indigo-400 opacity-0 group-hover:opacity-100 transition" />
+    </button>
+  );
 
   const fontOptions: { id: FontOption; label: string; style: string }[] = [
     { id: "sans", label: "Inter / Sans", style: "font-sans" },
@@ -162,41 +223,68 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-3">
-              {STYLE_PRESETS.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => onApplyPreset(p.id)}
-                  className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-indigo-500/50 hover:bg-white/10 transition text-left flex items-center justify-between group shadow-sm backdrop-blur-md"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-xl shadow-inner flex items-center justify-center shrink-0 border border-white/20"
-                      style={{
-                        background: p.canvasConfig?.bgGradient || "#18181b",
-                      }}
-                    >
-                      <div className="w-5 h-5 rounded-md bg-white/20 backdrop-blur border border-white/30" />
-                    </div>
-                    <div>
-                      <div className="font-semibold text-slate-100 group-hover:text-indigo-300 transition">
-                        {p.name}
-                      </div>
-                      <div className="text-[10px] text-slate-400 capitalize">
-                        {p.category} style • {p.cardConfig?.theme || "dark"} card
-                      </div>
-                    </div>
-                  </div>
-                  <Check className="w-4 h-4 text-indigo-400 opacity-0 group-hover:opacity-100 transition" />
-                </button>
-              ))}
-            </div>
+            <h4 className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">
+              Tweet Cards
+            </h4>
+            <div className="grid grid-cols-1 gap-3">{tweetPresets.map(renderPresetButton)}</div>
+
+            <h3 className="text-[11px] uppercase tracking-widest text-slate-400 font-bold flex items-center gap-1.5 pt-2">
+              <Quote className="w-3.5 h-3.5 text-rose-400" />
+              Quote Posters
+            </h3>
+            <p className="text-[10px] text-slate-500 -mt-2">
+              Big typographic quote graphics — the Instagram quote-post format.
+            </p>
+
+            <div className="grid grid-cols-1 gap-3">{posterPresets.map(renderPresetButton)}</div>
           </div>
         )}
 
         {/* BACKGROUND / CANVAS TAB */}
         {activeTab === "background" && (
           <div className="space-y-6">
+            {/* Frame Mode: keep the padded background frame, or drop it and let
+                the card be the whole image. */}
+            <div className="space-y-2">
+              <label className="font-semibold text-zinc-200 block">Frame Mode</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => onUpdateCanvas({ frameMode: "canvas" })}
+                  className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition ${
+                    !isBare
+                      ? "border-rose-500 ring-1 ring-rose-500 bg-rose-500/10 text-rose-300"
+                      : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700"
+                  }`}
+                >
+                  <Frame className="w-4 h-4" />
+                  <span className="font-semibold text-xs">Canvas Frame</span>
+                  <span className="text-[10px] opacity-75 leading-tight">
+                    Card floats on a padded background
+                  </span>
+                </button>
+                <button
+                  onClick={() => onUpdateCanvas({ frameMode: "bare" })}
+                  className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition ${
+                    isBare
+                      ? "border-emerald-500 ring-1 ring-emerald-500 bg-emerald-500/10 text-emerald-300"
+                      : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700"
+                  }`}
+                >
+                  <Expand className="w-4 h-4" />
+                  <span className="font-semibold text-xs">Card Only</span>
+                  <span className="text-[10px] opacity-75 leading-tight">
+                    Card fills the image, edge to edge
+                  </span>
+                </button>
+              </div>
+              {isBare && (
+                <p className="text-[10px] text-emerald-400/80 leading-relaxed">
+                  The background frame is off — the card paints its own background, so pick the look
+                  under Card → Theme. Corner radius above 0 exports with transparent corners.
+                </p>
+              )}
+            </div>
+
             {/* Aspect Ratio Selector */}
             <div className="space-y-2">
               <label className="font-semibold text-zinc-200 block">Canvas Ratio</label>
@@ -218,10 +306,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
 
-            {/* Canvas Padding Slider */}
+            {/* Padding Slider — the frame's padding, or the card's own inset in bare mode */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="font-semibold text-zinc-200">Padding</label>
+                <label className="font-semibold text-zinc-200">
+                  {isBare ? "Card Inset Padding" : "Padding"}
+                </label>
                 <span className="text-zinc-400 font-mono">{canvasConfig.padding}px</span>
               </div>
               <input
@@ -233,11 +323,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onChange={(e) => onUpdateCanvas({ padding: parseInt(e.target.value, 10) })}
                 className="w-full accent-rose-500 bg-zinc-800 h-1.5 rounded-lg appearance-none cursor-pointer"
               />
+              {isBare && (
+                <p className="text-[10px] text-zinc-500">
+                  Space between the card's content and the edge of the image.
+                </p>
+              )}
             </div>
 
             {/* Background Style Type */}
             <div className="space-y-3">
-              <label className="font-semibold text-zinc-200 block">Gradient Palette</label>
+              <label className="font-semibold text-zinc-200 block">
+                Gradient Palette
+                {isBare && cardConfig.theme !== "gradient" && (
+                  <span className="ml-1.5 font-normal text-[10px] text-zinc-500">
+                    (used by the Gradient Fill card theme)
+                  </span>
+                )}
+              </label>
               <div className="grid grid-cols-4 gap-2">
                 {GRADIENT_PRESETS.map((grad) => (
                   <button
@@ -314,6 +416,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* CARD STYLE TAB */}
         {activeTab === "card" && (
           <div className="space-y-6">
+            {/* Card Layout: full tweet card vs. big quote graphic */}
+            <div className="space-y-2">
+              <label className="font-semibold text-zinc-200 block">Card Layout</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => onUpdateCard({ layout: "tweet" })}
+                  className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition ${
+                    !isPoster
+                      ? "border-indigo-500 ring-1 ring-indigo-500 bg-indigo-500/10 text-indigo-300"
+                      : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700"
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span className="font-semibold text-xs">Tweet Card</span>
+                  <span className="text-[10px] opacity-75 leading-tight">
+                    Avatar, handle, metrics
+                  </span>
+                </button>
+                <button
+                  onClick={() => onUpdateCard({ layout: "poster" })}
+                  className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition ${
+                    isPoster
+                      ? "border-indigo-500 ring-1 ring-indigo-500 bg-indigo-500/10 text-indigo-300"
+                      : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700"
+                  }`}
+                >
+                  <Quote className="w-4 h-4" />
+                  <span className="font-semibold text-xs">Quote Poster</span>
+                  <span className="text-[10px] opacity-75 leading-tight">
+                    Big type, author credit
+                  </span>
+                </button>
+              </div>
+            </div>
+
             {/* Card Theme Picker */}
             <div className="space-y-2">
               <label className="font-semibold text-zinc-200 block">Card Theme</label>
@@ -379,40 +516,135 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
 
-            {/* Font Size Slider */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="font-semibold text-zinc-200">Font Size</label>
-                <span className="text-zinc-400 font-mono">{cardConfig.fontSize}px</span>
-              </div>
-              <input
-                type="range"
-                min={12}
-                max={24}
-                step={1}
-                value={cardConfig.fontSize}
-                onChange={(e) => onUpdateCard({ fontSize: parseInt(e.target.value, 10) })}
-                className="w-full accent-rose-500 bg-zinc-800 h-1.5 rounded-lg appearance-none cursor-pointer"
-              />
-            </div>
+            {/* Font Size Slider — the quote size takes over in poster mode */}
+            {isPoster ? (
+              <div className="space-y-4 p-3 rounded-2xl bg-white/5 border border-white/10">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-semibold text-zinc-200">Quote Size</label>
+                    <span className="text-zinc-400 font-mono">{cardConfig.posterFontSize}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={24}
+                    max={80}
+                    step={2}
+                    value={cardConfig.posterFontSize}
+                    onChange={(e) => onUpdateCard({ posterFontSize: parseInt(e.target.value, 10) })}
+                    className="w-full accent-rose-500 bg-zinc-800 h-1.5 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
 
-            {/* Card Width Slider (size of the inner card within the canvas) */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="font-semibold text-zinc-200">Card Width</label>
-                <span className="text-zinc-400 font-mono">{cardConfig.cardWidth}px</span>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-zinc-200 block">Auto-fit Long Quotes</span>
+                    <span className="text-[10px] text-zinc-500">Shrink the type as text grows</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={cardConfig.posterAutoFit}
+                    onChange={(e) => onUpdateCard({ posterAutoFit: e.target.checked })}
+                    className="w-4 h-4 accent-rose-500 rounded cursor-pointer"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="font-semibold text-zinc-200 block">Quote Alignment</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { id: "left", label: "Left", Icon: AlignLeft },
+                      { id: "center", label: "Center", Icon: AlignCenter },
+                    ] as const).map(({ id, label, Icon }) => (
+                      <button
+                        key={id}
+                        onClick={() => onUpdateCard({ textAlignment: id })}
+                        className={`py-2 rounded-xl border flex items-center justify-center gap-1.5 transition ${
+                          cardConfig.textAlignment === id
+                            ? "border-rose-500 bg-rose-500/10 text-rose-400 font-bold"
+                            : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200"
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="font-semibold text-zinc-200 block">Quote Mark</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {posterMarks.map((mark) => (
+                      <button
+                        key={mark.id}
+                        onClick={() => onUpdateCard({ posterMark: mark.id })}
+                        className={`py-2 px-1 rounded-xl border text-center transition ${
+                          cardConfig.posterMark === mark.id
+                            ? "border-rose-500 bg-rose-500/10 text-rose-400 font-bold"
+                            : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200"
+                        }`}
+                      >
+                        {mark.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-zinc-200 block flex items-center gap-1.5">
+                      <Minus className="w-3.5 h-3.5 text-rose-400" />
+                      Inset Hairline Frame
+                    </span>
+                    <span className="text-[10px] text-zinc-500">Thin border inside the edge</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={cardConfig.posterInsetBorder}
+                    onChange={(e) => onUpdateCard({ posterInsetBorder: e.target.checked })}
+                    className="w-4 h-4 accent-rose-500 rounded cursor-pointer"
+                  />
+                </div>
               </div>
-              <input
-                type="range"
-                min={320}
-                max={720}
-                step={8}
-                value={cardConfig.cardWidth}
-                onChange={(e) => onUpdateCard({ cardWidth: parseInt(e.target.value, 10) })}
-                className="w-full accent-rose-500 bg-zinc-800 h-1.5 rounded-lg appearance-none cursor-pointer"
-              />
-              <p className="text-[10px] text-zinc-500">Controls how large the tweet card is inside the canvas frame.</p>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-zinc-200">Font Size</label>
+                  <span className="text-zinc-400 font-mono">{cardConfig.fontSize}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={12}
+                  max={24}
+                  step={1}
+                  value={cardConfig.fontSize}
+                  onChange={(e) => onUpdateCard({ fontSize: parseInt(e.target.value, 10) })}
+                  className="w-full accent-rose-500 bg-zinc-800 h-1.5 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+            )}
+
+            {/* Card Width Slider — meaningless once the card fills the image */}
+            {!isBare && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-zinc-200">Card Width</label>
+                  <span className="text-zinc-400 font-mono">{cardConfig.cardWidth}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={320}
+                  max={720}
+                  step={8}
+                  value={cardConfig.cardWidth}
+                  onChange={(e) => onUpdateCard({ cardWidth: parseInt(e.target.value, 10) })}
+                  className="w-full accent-rose-500 bg-zinc-800 h-1.5 rounded-lg appearance-none cursor-pointer"
+                />
+                <p className="text-[10px] text-zinc-500">
+                  Controls how large the card is inside the canvas frame.
+                </p>
+              </div>
+            )}
 
             {/* Corner Radius Slider */}
             <div className="space-y-2">
@@ -581,16 +813,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <h3 className="font-semibold text-slate-200 text-xs uppercase tracking-wider">Visible Elements</h3>
 
             <div className="space-y-1.5 bg-white/5 p-3 rounded-2xl border border-white/10 backdrop-blur-md">
-              {[
-                { key: "showAvatar", label: "Author Avatar" },
-                { key: "showVerified", label: "Verified Badge" },
-                { key: "showTwitterLogo", label: "X Logo" },
-                { key: "showTimestamp", label: "Date & Timestamp" },
-                { key: "showMetrics", label: "Engagement Metrics" },
-                { key: "showMedia", label: "Media Attachments" },
-                { key: "showQuote", label: "Quoted Tweet Block" },
-                { key: "showWatermark", label: "Custom Watermark" },
-              ].map((item) => (
+              {(isPoster
+                ? [
+                    { key: "showAttribution", label: "Author Credit Line" },
+                    { key: "showAvatar", label: "Author Avatar" },
+                    { key: "showVerified", label: "Verified Badge" },
+                    { key: "showTwitterLogo", label: "X Logo" },
+                    { key: "showWatermark", label: "Footer Signature" },
+                  ]
+                : [
+                    { key: "showAvatar", label: "Author Avatar" },
+                    { key: "showVerified", label: "Verified Badge" },
+                    { key: "showTwitterLogo", label: "X Logo" },
+                    { key: "showTimestamp", label: "Date & Timestamp" },
+                    { key: "showMetrics", label: "Engagement Metrics" },
+                    { key: "showMedia", label: "Media Attachments" },
+                    { key: "showQuote", label: "Quoted Tweet Block" },
+                    { key: "showWatermark", label: "Custom Watermark" },
+                  ]
+              ).map((item) => (
                 <label
                   key={item.key}
                   className="flex items-center justify-between py-2 px-2.5 rounded-xl hover:bg-white/5 cursor-pointer transition text-xs"
@@ -609,7 +850,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Watermark Input */}
             {cardConfig.showWatermark && (
               <div className="space-y-1 pt-2">
-                <label className="text-zinc-400 block text-[11px]">Watermark Text</label>
+                <label className="text-zinc-400 block text-[11px]">
+                  {isPoster ? "Footer Signature Text" : "Watermark Text"}
+                </label>
                 <input
                   type="text"
                   value={cardConfig.watermarkText}
@@ -621,7 +864,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
 
             {/* Quick Metrics Editor */}
-            <div className="pt-4 border-t border-zinc-900 space-y-3">
+            <div className={`pt-4 border-t border-zinc-900 space-y-3 ${isPoster ? "hidden" : ""}`}>
               <h4 className="font-semibold text-zinc-200">Metrics Formatter</h4>
               <div className="flex items-center gap-2">
                 <button
